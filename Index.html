@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Detection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-dot.active {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.armed {
+            background: #f44336;
+        }
+
+        .status-dot.disarmed {
+            background: #ff9800;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 18px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            margin: 10px;
+        }
+
+        .btn-arm {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-arm:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        }
+
+        .btn-disarm {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-disarm:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .image-display {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .image-display h2 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .latest-image {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            display: block;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .no-image {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+            font-size: 18px;
+        }
+
+        .alert {
+            background: #ff5252;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+            animation: alertPulse 1s infinite;
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .gallery-item {
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.05);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .timestamp {
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Motion Detection System</h1>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="status-dot" id="espStatus"></span>
+                    <span>ESP32: <strong id="espText">Disconnected</strong></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot" id="cameraStatus"></span>
+                    <span>Camera: <strong id="cameraText">Disconnected</strong></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot" id="systemStatus"></span>
+                    <span>System: <strong id="systemText">Disarmed</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h2>System Controls</h2>
+            <button class="btn btn-arm" onclick="armSystem(true)">🔴 ARM SYSTEM</button>
+            <button class="btn btn-disarm" onclick="armSystem(false)">🟢 DISARM SYSTEM</button>
+        </div>
+
+        <div class="image-display">
+            <div id="alertBox" style="display: none;" class="alert">
+                ⚠️ INTRUDER DETECTED!
+            </div>
+            <h2>Latest Capture</h2>
+            <div id="imageContainer">
+                <div class="no-image">No motion detected yet</div>
+            </div>
+            <div class="timestamp" id="timestamp"></div>
+        </div>
+
+        <div class="image-display">
+            <h2>Recent Captures</h2>
+            <div id="galleryContainer" class="image-gallery"></div>
+        </div>
+    </div>
+
+    <script>
+        let lastImage = null;
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // Update ESP status
+                const espDot = document.getElementById('espStatus');
+                const espText = document.getElementById('espText');
+                if (data.esp_connected) {
+                    espDot.classList.add('active');
+                    espText.textContent = 'Connected';
+                } else {
+                    espDot.classList.remove('active');
+                    espText.textContent = 'Disconnected';
+                }
+
+                // Update Camera status
+                const cameraDot = document.getElementById('cameraStatus');
+                const cameraText = document.getElementById('cameraText');
+                if (data.camera_connected) {
+                    cameraDot.classList.add('active');
+                    cameraText.textContent = 'Connected';
+                } else {
+                    cameraDot.classList.remove('active');
+                    cameraText.textContent = 'Disconnected';
+                }
+
+                // Update System status
+                const systemDot = document.getElementById('systemStatus');
+                const systemText = document.getElementById('systemText');
+                systemDot.classList.remove('armed', 'disarmed');
+                if (data.armed) {
+                    systemDot.classList.add('armed');
+                    systemText.textContent = 'Armed';
+                } else {
+                    systemDot.classList.add('disarmed');
+                    systemText.textContent = 'Disarmed';
+                }
+
+                // Update latest image
+                if (data.latest_image && data.latest_image !== lastImage) {
+                    lastImage = data.latest_image;
+                    showAlert();
+                    displayImage(data.latest_image);
+                    loadGallery();
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        function displayImage(filename) {
+            const container = document.getElementById('imageContainer');
+            const timestamp = document.getElementById('timestamp');
+            
+            container.innerHTML = `<img src="/captures/${filename}" alt="Intruder detected" class="latest-image">`;
+            
+            // Extract timestamp from filename
+            const parts = filename.replace('intruder_', '').replace('.jpg', '');
+            const date = parts.substring(0, 8);
+            const time = parts.substring(9);
+            const formattedDate = `${date.substring(6, 8)}/${date.substring(4, 6)}/${date.substring(0, 4)}`;
+            const formattedTime = `${time.substring(0, 2)}:${time.substring(2, 4)}:${time.substring(4, 6)}`;
+            
+            timestamp.textContent = `Captured: ${formattedDate} at ${formattedTime}`;
+        }
+
+        function showAlert() {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.style.display = 'block';
+            
+            setTimeout(() => {
+                alertBox.style.display = 'none';
+            }, 5000);
+        }
+
+        async function armSystem(arm) {
+            try {
+                const response = await fetch('/api/arm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ arm: arm })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus();
+                } else {
+                    alert('Failed to update system: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadGallery() {
+            try {
+                const response = await fetch('/api/latest_images');
+                const data = await response.json();
+                
+                if (data.images && data.images.length > 0) {
+                    const gallery = document.getElementById('galleryContainer');
+                    gallery.innerHTML = data.images.map(img => `
+                        <div class="gallery-item" onclick="displayImage('${img}')">
+                            <img src="/captures/${img}" alt="${img}">
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading gallery:', error);
+            }
+        }
+
+        // Update status every second
+        setInterval(updateStatus, 1000);
+        
+        // Initial load
+        updateStatus();
+        loadGallery();
+    </script>
+</body>
+</html>
